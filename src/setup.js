@@ -33,22 +33,16 @@ async function run() {
 async function installUnityHub() {
     let unityHubPath = '';
     if (process.platform === 'linux') {
+        await execute(`mkdir -p "${process.env.HOME}/Unity Hub" "${process.env.HOME}/.config/Unity Hub"`);
+        await execute(`touch "${process.env.HOME}/.config/Unity Hub/eulaAccepted"`);
 
-        unityHubPath = `${process.env.HOME}/Unity Hub/UnityHub.AppImage`;
-        if (!fs.existsSync(unityHubPath)) {
-            const installerPath = await tc.downloadTool('https://public-cdn.cloud.unity3d.com/hub/prod/UnityHub.AppImage');
-            await execute(`mkdir -p "${process.env.HOME}/Unity Hub" "${process.env.HOME}/.config/Unity Hub"`);
-            await execute(`mv "${installerPath}" "${unityHubPath}"`);
-            await execute(`chmod +x "${unityHubPath}"`);
-            await execute(`touch "${process.env.HOME}/.config/Unity Hub/eulaAccepted"`);
-            try {
-                await execute('sudo apt-get update');
-                await execute('sudo apt-get install -y libgconf-2-4 libglu1 libasound2 libgtk2.0-0 libgtk-3-0 libnss3 zenity xvfb');
-            } catch {
-                // skip 'command not found' error
-            }
-        }
+        await execute(`bash -c "echo \\"deb https://hub.unity3d.com/linux/repos/deb stable main\\" | sudo tee /etc/apt/sources.list.d/unityhub.list"`);
+        await execute(`bash -c "wget -qO - https://hub.unity3d.com/linux/keys/public | sudo apt-key add -"`);
 
+        await execute('sudo apt-get update');
+        await execute('sudo apt-get install -y libgconf-2-4 libglu1 libasound2 libgtk2.0-0 libgtk-3-0 libnss3 zenity xvfb unityhub');
+
+        unityHubPath = "/bin/unityhub";
     } else if (process.platform === 'darwin') {
 
         unityHubPath = '/Applications/Unity Hub.app/Contents/MacOS/Unity Hub';
