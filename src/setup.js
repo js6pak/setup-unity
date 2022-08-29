@@ -8,7 +8,7 @@ async function run() {
     try {
         let unityVersion = core.getInput('unity-version');
         let unityVersionChangeset = core.getInput('unity-version-changeset');
-        const unityModules = getInputAsArray('unity-modules');
+        const unityModules = core.getInput('unity-modules');
         const unityModulesChild = getInputAsBool('unity-modules-child');
         const installPath = core.getInput('install-path');
         const projectPath = core.getInput('project-path');
@@ -19,10 +19,7 @@ async function run() {
             unityVersionChangeset = await findVersionChangeset(unityVersion);
         }
         const unityHubPath = await installUnityHub();
-        const unityPath = await installUnityEditor(unityHubPath, installPath, unityVersion, unityVersionChangeset);
-        if (unityModules.length > 0) {
-            await installUnityModules(unityHubPath, unityVersion, unityModules, unityModulesChild);
-        }
+        const unityPath = await installUnityEditor(unityHubPath, installPath, unityVersion, unityVersionChangeset, unityModules, unityModulesChild);
         await postInstall();
 
         core.setOutput('unity-version', unityVersion);
@@ -78,7 +75,7 @@ async function installUnityHub() {
     return unityHubPath;
 }
 
-async function installUnityEditor(unityHubPath, installPath, unityVersion, unityVersionChangeset) {
+async function installUnityEditor(unityHubPath, installPath, unityVersion, unityVersionChangeset, unityModules, unityModulesChild) {
     let unityPath = await findUnity(unityHubPath, unityVersion);
     if (!unityPath) {
         if (installPath) {
@@ -88,22 +85,27 @@ async function installUnityEditor(unityHubPath, installPath, unityVersion, unity
             }
             await executeHub(unityHubPath, `install-path --set "${installPath}"`);
         }
-        await executeHub(unityHubPath, `install --version ${unityVersion} --changeset ${unityVersionChangeset}`);
+
+        let cmdLine = `install --version ${unityVersion} --changeset ${unityVersionChangeset}`;
+
+        if (unityModules) {
+            cmdLine += " --module " + unityModules;
+        }
+
+        if (unityModulesChild) {
+            cmdLine += " --childModules";
+        }
+
+        const stdout = await executeHub(unityHubPath, cmdLine);
         unityPath = await findUnity(unityHubPath, unityVersion);
         if (!unityPath) {
             throw new Error('unity editor installation failed');
         }
+        if (!stdout.includes('successfully') || stdout.includes("Error:") || stdout.includes("Missing module")) {
+            throw new Error('unity modules installation failed');
+        }
     }
     return unityPath;
-}
-
-async function installUnityModules(unityHubPath, unityVersion, unityModules, unityModulesChild) {
-    const modulesArgs = unityModules.map(s => `--module ${s.toLowerCase()}`).join(' ');
-    const childModulesArg = unityModulesChild ? '--childModules' : '';
-    const stdout = await executeHub(unityHubPath, `install-modules --version ${unityVersion} ${modulesArgs} ${childModulesArg}`);
-    if (!stdout.includes('successfully') && !stdout.includes("it's already installed")) {
-        throw new Error('unity modules installation failed');
-    }
 }
 
 async function postInstall() {
@@ -191,14 +193,6 @@ async function execute(command, ignoreReturnCode) {
     });
     console.log(); // new line
     return stdout;
-}
-
-function getInputAsArray(name, options) {
-    return core
-        .getInput(name, options)
-        .split("\n")
-        .map(s => s.trim())
-        .filter(x => x !== "");
 }
 
 function getInputAsBool(name, options) {
