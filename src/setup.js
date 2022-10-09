@@ -95,7 +95,7 @@ async function installUnityEditor(unityHubPath, installPath, unityVersion, unity
         if (!unityPath) {
             throw new Error('unity editor installation failed');
         }
-        if (!stdout.includes('successfully') || stdout.includes("Error:") || stdout.includes("Missing module")) {
+        if (!stdout.includes('All Tasks Completed Successfully.') || stdout.includes("Missing module")) {
             throw new Error('unity modules installation failed');
         }
     }
